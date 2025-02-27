@@ -1,0 +1,86 @@
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.io.wavfile import write
+from scipy import signal
+from scipy.fft import fft, fftfreq
+from IPython.display import Audio
+
+# Định nghĩa hàm tạo nốt nhạc
+def notecreate(frq, dur):
+    return 2 * np.sin(2 * np.pi * np.arange(dur) / 44100 * (440 * 2 ** ((frq - 1) / 12)))
+
+# Định nghĩa tên các nốt nhạc
+notename = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'Fm', 'G', 'G#', 'A', 'A#', 'B']
+
+# Định nghĩa một bài hát khác (ví dụ: Twinkle Twinkle Little Star)
+new_song = [
+    'C', 'C', 'G', 'G', 'A', 'A', 'G',
+    'F', 'F', 'E', 'E', 'D', 'D', 'C',
+    'G', 'G', 'F', 'F', 'E', 'E', 'D',
+    'G', 'G', 'F', 'F', 'E', 'E', 'D',
+    'C', 'C', 'G', 'G', 'A', 'A', 'G',
+    'F', 'F', 'E', 'E', 'D', 'D', 'C'
+]
+
+# Lấy chỉ số của các nốt trong bài hát
+new_song_idx = [notename.index(note) for note in new_song]
+
+# Định nghĩa độ dài của mỗi nốt nhạc
+dur = int(0.3 * 44100)
+
+# Tạo các nốt nhạc của bài hát
+new_song_note = np.array([])
+for idx in new_song_idx:
+    new_song_note = np.concatenate((new_song_note, notecreate(idx, dur), np.zeros(75)))
+
+
+# Lọc nhiễu với bộ lọc thông thấp
+def low_pass_filter(data, cutoff, fs, order= 10):
+    nyquist = 0.5 * fs
+    normal_cutoff = cutoff / nyquist
+    b, a = signal.butter(order, normal_cutoff, btype='low', analog=False)
+    y = signal.filtfilt(b, a, data)
+    return y
+
+# Áp dụng bộ lọc thông thấp
+filtered_song_note = low_pass_filter(new_song_note, cutoff=1000, fs=44100)
+# Phát âm thanh và ghi âm thanh vào file
+display(Audio(filtered_song_note, rate=44100))
+write('filtered_new_song.wav', 44100, filtered_song_note.astype(np.float32))
+
+# Vẽ phổ biên độ theo tần số và thời gian
+plt.figure(figsize=(10, 6))
+
+# Vẽ đồ thị thời gian
+plt.subplot(2, 1, 1)
+plt.plot(np.arange(len(filtered_song_note)) / 44100, filtered_song_note)
+plt.title('Time Domain')
+plt.xlabel('Time (s)')
+plt.ylabel('Amplitude')
+
+# Vẽ phổ biên độ
+plt.subplot(2, 1, 2)
+frequencies, times, Sxx = signal.spectrogram(filtered_song_note, 44100)
+plt.pcolormesh(times, frequencies, 10 * np.log10(Sxx), shading='gouraud')
+plt.title('Frequency Domain')
+plt.xlabel('Time (s)')
+plt.ylabel('Frequency (Hz)')
+plt.colorbar(label='Intensity (dB)')
+
+plt.tight_layout()
+plt.show()
+
+# Phân tích Fourier để tìm tần số nhiễu
+N = len(filtered_song_note)
+T = 1.0 / 44100.0
+yf = fft(filtered_song_note)
+xf = fftfreq(N, T)[:N//2]
+
+plt.figure(figsize=(10, 4))
+plt.plot(xf, 2.0/N * np.abs(yf[:N//2]))
+plt.title('Fourier Transform')
+plt.xlabel('Frequency (Hz)')
+plt.ylabel('Amplitude')
+plt.xlim(0,1000)
+plt.grid()
+plt.show()
